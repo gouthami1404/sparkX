@@ -1,4 +1,4 @@
-# PixelGenesis Setup Guide
+# NexID Setup Guide
 
 ## Prerequisites
 

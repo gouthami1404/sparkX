@@ -1,4 +1,4 @@
-# What's Next - Using PixelGenesis
+# What's Next - Using NexID
 
 Great! You've completed the setup. Now let's start using the app!
 

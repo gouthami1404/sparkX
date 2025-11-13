@@ -12,6 +12,7 @@ artifacts/
 # Frontend
 frontend/node_modules/
 frontend/build/
+frontend/.env
 frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local

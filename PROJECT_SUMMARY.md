@@ -1,8 +1,8 @@
-# PixelGenesis - Project Summary
+# NexID - Project Summary
 
 ## Overview
 
-PixelGenesis is a complete decentralized web application for managing digital identity and verifiable credentials. It provides users with self-sovereign control over their identity and documents using Ethereum smart contracts and IPFS.
+NexID is a complete decentralized web application for managing digital identity and verifiable credentials. It provides users with self-sovereign control over their identity and documents using Ethereum smart contracts and IPFS.
 
 ## Architecture
 

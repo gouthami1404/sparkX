@@ -1,4 +1,4 @@
-# PixelGenesis: Decentralized Digital Identity & Credential Vault
+# NexID: Decentralized Digital Identity & Credential Vault
 
 A decentralized web application that gives users self-sovereign control over their identity and documents using Ethereum smart contracts and IPFS.
 
@@ -13,7 +13,7 @@ A decentralized web application that gives users self-sovereign control over the
 ## Project Structure
 
 ```
-pixelgenesis/
+nexid/
 ├── contracts/          # Solidity smart contracts
 ├── scripts/           # Deployment scripts
 ├── test/              # Hardhat tests
