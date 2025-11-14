@@ -110,21 +110,70 @@ export const getCurrentAccount = async () => {
 };
 
 /**
- * Get provider instance
+ * Get provider instance with error handling
  */
 export const getProvider = () => {
   if (!checkMetaMask()) {
     throw new Error('MetaMask is not installed');
   }
-  return new ethers.BrowserProvider(window.ethereum);
+  
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    return provider;
+  } catch (error) {
+    console.error('Error creating provider:', error);
+    throw new Error(`Failed to create provider: ${error.message}`);
+  }
 };
 
 /**
- * Get signer instance
+ * Check if RPC endpoint is accessible
+ */
+export const checkRpcConnection = async () => {
+  try {
+    const provider = getProvider();
+    const blockNumber = await provider.getBlockNumber();
+    return { connected: true, blockNumber };
+  } catch (error) {
+    console.error('RPC connection check failed:', error);
+    return { connected: false, error: error.message };
+  }
+};
+
+/**
+ * Retry a function with exponential backoff
+ */
+export const retryWithBackoff = async (fn, maxRetries = 3, initialDelay = 1000) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      // Check if it's an RPC error that we should retry
+      const errorMessage = error.message || error.toString();
+      if (errorMessage.includes('RPC endpoint') || 
+          errorMessage.includes('too many errors') ||
+          errorMessage.includes('network') ||
+          error.code === -32002) {
+        const delay = initialDelay * Math.pow(2, i);
+        console.log(`Retrying after ${delay}ms (attempt ${i + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
+/**
+ * Get signer instance with retry logic
  */
 export const getSigner = async () => {
-  const provider = getProvider();
-  return await provider.getSigner();
+  return await retryWithBackoff(async () => {
+    const provider = getProvider();
+    return await provider.getSigner();
+  });
 };
 
 /**
@@ -143,18 +192,21 @@ export const getDIDRegistryContract = async () => {
 };
 
 /**
- * Get CredentialManager contract instance
+ * Get CredentialManager contract instance with retry logic
  */
 export const getCredentialManagerContract = async () => {
   if (!CONTRACT_ADDRESSES.CredentialManager) {
     throw new Error('CredentialManager contract address not set. Please deploy contracts first.');
   }
-  const signer = await getSigner();
-  return new ethers.Contract(
-    CONTRACT_ADDRESSES.CredentialManager,
-    CREDENTIAL_MANAGER_ABI,
-    signer
-  );
+  
+  return await retryWithBackoff(async () => {
+    const signer = await getSigner();
+    return new ethers.Contract(
+      CONTRACT_ADDRESSES.CredentialManager,
+      CREDENTIAL_MANAGER_ABI,
+      signer
+    );
+  });
 };
 
 /**

@@ -1,14 +1,19 @@
 import { motion } from 'framer-motion'
-import { Wallet, Upload, Share2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Shield, Lock, Globe, Wallet } from 'lucide-react'
 import { connectWallet } from '../utils/web3'
 import Particles from '../components/Particles.jsx'
 
 const Landing = ({ setAccount }) => {
+  const navigate = useNavigate()
+
   const handleConnect = async () => {
     try {
       const account = await connectWallet()
-      setAccount(account)
-      // Navigation to dashboard is handled by App.jsx
+      if (account) {
+        setAccount(account)
+        navigate('/dashboard')
+      }
     } catch (error) {
       console.error('Connection error:', error)
       alert('Failed to connect wallet. Please make sure MetaMask is installed and unlocked.')
@@ -17,10 +22,10 @@ const Landing = ({ setAccount }) => {
 
   return (
     <div className="min-h-screen bg-dark-bg relative overflow-hidden">
-      {/* Particles Background - Star-like animation */}
+      {/* Particles Background - Glowing blue dots */}
       <div className="absolute inset-0 z-0">
         <Particles
-          particleColors={['#ffffff', '#ffffff', '#ffffff']}
+          particleColors={['#3B82F6', '#60A5FA', '#93C5FD']}
           particleCount={300}
           particleSpread={15}
           speed={0.05}
@@ -30,46 +35,6 @@ const Landing = ({ setAccount }) => {
           disableRotation={false}
         />
       </div>
-      
-      {/* Floating Neon Orbs Background */}
-      <motion.div
-        className="glow-orb w-96 h-96 bg-neon-cyan top-20 left-10"
-        animate={{
-          y: [0, -30, 0],
-          x: [0, 20, 0],
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
-      <motion.div
-        className="glow-orb w-80 h-80 bg-neon-purple bottom-20 right-10"
-        animate={{
-          y: [0, 30, 0],
-          x: [0, -20, 0],
-        }}
-        transition={{
-          duration: 10,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 1
-        }}
-      />
-      <motion.div
-        className="glow-orb w-72 h-72 bg-neon-cyan top-1/2 right-1/4"
-        animate={{
-          y: [0, -20, 0],
-          scale: [1, 1.1, 1],
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 2
-        }}
-      />
 
       {/* Main Content */}
       <div className="relative z-10 container mx-auto px-4 py-16">
@@ -87,7 +52,8 @@ const Landing = ({ setAccount }) => {
                 transition={{ delay: 0.2, duration: 0.6 }}
                 className="text-pixel text-5xl md:text-7xl mb-6 text-white"
                 style={{ 
-                  textShadow: '0 0 5px rgba(255, 255, 255, 0.3), 0 0 10px rgba(255, 255, 255, 0.2)'
+                  textShadow: '0 0 8px rgba(59, 130, 246, 0.5), 0 0 16px rgba(59, 130, 246, 0.3)',
+                  color: '#E0F2FE'
                 }}
               >
                 NexID
@@ -99,7 +65,7 @@ const Landing = ({ setAccount }) => {
                 transition={{ delay: 0.4, duration: 0.8 }}
                 className="mb-6"
               >
-                <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-100">
+                <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
                   Own Your Digital Identity
                 </h2>
               </motion.div>
@@ -108,13 +74,13 @@ const Landing = ({ setAccount }) => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6, duration: 0.8 }}
-                className="text-xl md:text-2xl text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed"
+                className="text-xl md:text-2xl text-white mb-12 max-w-2xl mx-auto leading-relaxed"
               >
                 Securely store and share your important documents. You stay in control.
               </motion.p>
             </motion.div>
 
-            {/* CTA Buttons */}
+            {/* CTA Button */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -123,73 +89,62 @@ const Landing = ({ setAccount }) => {
             >
               <motion.button
                 onClick={handleConnect}
-                className="neon-button text-lg px-8 py-4 flex items-center gap-2"
-                whileHover={{ scale: 1.05 }}
+                className="px-8 py-4 rounded-lg font-semibold text-lg flex items-center gap-2 transition-all duration-300"
+                style={{
+                  background: 'transparent',
+                  color: '#3B82F6',
+                  border: '2px solid #3B82F6',
+                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.2)'
+                }}
+                whileHover={{ 
+                  scale: 1.05,
+                  boxShadow: '0 0 16px rgba(59, 130, 246, 0.6), 0 0 30px rgba(59, 130, 246, 0.3)'
+                }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Wallet size={24} />
-                Connect Wallet
+                <Wallet size={20} />
+                Connect to Wallet
               </motion.button>
             </motion.div>
           </div>
 
-          {/* How It Works Section */}
+          {/* Feature Cards Section */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1, duration: 0.8 }}
-            className="mt-32"
+            className="mt-16"
           >
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="text-pixel text-3xl md:text-4xl text-white text-center mb-4"
-              style={{ 
-                textShadow: '0 0 5px rgba(255, 255, 255, 0.3), 0 0 10px rgba(255, 255, 255, 0.2)'
-              }}
-            >
-              How It Works
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="text-lg text-gray-400 text-center mb-12 max-w-2xl mx-auto"
-            >
-              Simple, secure, and completely under your control. Here's how you can own your digital identity.
-            </motion.p>
-
-            {/* Steps */}
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {[
                 {
-                  number: '1',
-                  icon: <Wallet size={40} />,
-                  title: 'Connect Your Wallet',
-                  description: 'Connect your MetaMask wallet. This becomes your unique digital identity - no passwords, no usernames, just your secure key. Your wallet address is your ID.',
-                  colorClass: 'text-neon-cyan',
-                  gradient: 'from-cyan-500/20 to-cyan-900/10'
+                  icon: <Shield size={48} />,
+                  title: 'Secure',
+                  description: 'Your documents are encrypted and stored on decentralized storage',
+                  color: '#3B82F6',
+                  glowColor: 'rgba(59, 130, 246, 0.25)',
+                  outerGlowColor: 'rgba(59, 130, 246, 0.15)',
+                  hoverOuterGlowColor: 'rgba(59, 130, 246, 0.2)'
                 },
                 {
-                  number: '2',
-                  icon: <Upload size={40} />,
-                  title: 'Upload Documents',
-                  description: 'Upload important documents like degrees, certificates, or IDs. They\'re stored securely on IPFS (a decentralized cloud) - only you control access.',
-                  colorClass: 'text-neon-purple',
-                  gradient: 'from-purple-500/20 to-purple-900/10'
+                  icon: <Lock size={48} />,
+                  title: 'Private',
+                  description: 'You control who sees your documents and when',
+                  color: '#6366F1',
+                  glowColor: 'rgba(99, 102, 241, 0.25)',
+                  outerGlowColor: 'rgba(99, 102, 241, 0.15)',
+                  hoverOuterGlowColor: 'rgba(99, 102, 241, 0.2)'
                 },
                 {
-                  number: '3',
-                  icon: <Share2 size={40} />,
-                  title: 'Share or Verify',
-                  description: 'Share your documents when needed, or let others verify their authenticity. Generate proof documents with only the information you want to share.',
-                  colorClass: 'text-neon-cyan',
-                  gradient: 'from-cyan-500/20 to-cyan-900/10'
+                  icon: <Globe size={48} />,
+                  title: 'Decentralized',
+                  description: 'No central server. Your identity, your rules',
+                  color: '#60A5FA',
+                  glowColor: 'rgba(96, 165, 250, 0.25)',
+                  outerGlowColor: 'rgba(96, 165, 250, 0.15)',
+                  hoverOuterGlowColor: 'rgba(96, 165, 250, 0.2)'
                 }
-              ].map((step, index) => (
+              ].map((feature, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 50 }}
@@ -199,28 +154,22 @@ const Landing = ({ setAccount }) => {
                   className="relative"
                 >
                   <motion.div
-                    className={`glass-card p-8 rounded-2xl border-2 bg-gradient-to-br ${step.gradient} ${index % 2 === 0 ? 'border-cyan-500/30' : 'border-purple-500/30'} h-full`}
+                    className="glass-card p-8 rounded-2xl border-2 bg-gradient-to-br from-transparent to-transparent h-full flex flex-col items-center text-center"
+                    style={{
+                      borderColor: feature.color,
+                      boxShadow: `0 0 12px ${feature.glowColor}, 0 0 20px ${feature.outerGlowColor}`
+                    }}
                     whileHover={{ 
                       scale: 1.05,
                       y: -10,
-                      boxShadow: "0 0 40px rgba(0, 255, 198, 0.3)"
+                      boxShadow: `0 0 18px ${feature.glowColor}, 0 0 30px ${feature.hoverOuterGlowColor}`
                     }}
                     transition={{ duration: 0.3 }}
                   >
-                    {/* Step Number */}
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      whileInView={{ scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: index * 0.2 + 0.3, type: "spring" }}
-                      className="text-pixel text-2xl neon-cyan mb-4"
-                    >
-                      {step.number}
-                    </motion.div>
-
                     {/* Icon with Glow */}
                     <motion.div
-                      className={`${step.colorClass} mb-6 relative inline-block`}
+                      className="mb-6 relative inline-block"
+                      style={{ color: feature.color }}
                       animate={{
                         scale: [1, 1.1, 1],
                       }}
@@ -231,18 +180,26 @@ const Landing = ({ setAccount }) => {
                         delay: index * 0.5
                       }}
                     >
-                      <div className="absolute inset-0 blur-xl opacity-50 bg-current rounded-full" />
+                      <div className="absolute inset-0 blur-xl opacity-30 rounded-full" style={{ backgroundColor: feature.color }} />
                       <div className="relative">
-                        {step.icon}
+                        {feature.icon}
                       </div>
                     </motion.div>
 
-                    {/* Content */}
-                    <h3 className="text-xl md:text-2xl font-bold text-gray-100 mb-3">
-                      {step.title}
+                    {/* Title */}
+                    <h3 
+                      className="text-pixel text-xl md:text-2xl mb-4 w-full"
+                      style={{ 
+                        color: feature.color,
+                        textShadow: `0 0 6px ${feature.color}, 0 0 12px ${feature.color}`
+                      }}
+                    >
+                      {feature.title}
                     </h3>
-                    <p className="text-gray-300 leading-relaxed">
-                      {step.description}
+
+                    {/* Description */}
+                    <p className="text-gray-300 leading-relaxed text-base text-center">
+                      {feature.description}
                     </p>
                   </motion.div>
                 </motion.div>

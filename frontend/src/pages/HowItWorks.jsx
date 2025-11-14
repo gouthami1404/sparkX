@@ -35,6 +35,7 @@ const HowItWorks = () => {
       {/* Animated Background Orbs */}
       <motion.div
         className="glow-orb w-96 h-96 bg-neon-purple top-10 right-10"
+        style={{ opacity: 0.15 }}
         animate={{
           y: [0, -40, 0],
           x: [0, 30, 0],
@@ -47,6 +48,7 @@ const HowItWorks = () => {
       />
       <motion.div
         className="glow-orb w-80 h-80 bg-neon-cyan bottom-10 left-10"
+        style={{ opacity: 0.15 }}
         animate={{
           y: [0, 40, 0],
           x: [0, -30, 0],
@@ -60,9 +62,10 @@ const HowItWorks = () => {
       />
       <motion.div
         className="glow-orb w-64 h-64 bg-neon-purple top-1/2 left-1/3"
+        style={{ opacity: 0.15 }}
         animate={{
           scale: [1, 1.2, 1],
-          opacity: [0.3, 0.5, 0.3],
+          opacity: [0.15, 0.2, 0.15],
         }}
         transition={{
           duration: 8,
@@ -118,10 +121,10 @@ const HowItWorks = () => {
               className="relative"
             >
               <motion.div
-                className={`glass-card p-8 md:p-10 rounded-2xl border-2 bg-gradient-to-br ${step.gradient} ${index % 2 === 0 ? 'border-cyan-500/30' : 'border-purple-500/30'}`}
+                className={`glass-card p-8 md:p-10 rounded-2xl border-2 bg-gradient-to-br ${step.gradient} ${index % 2 === 0 ? 'border-blue-500/20' : 'border-indigo-500/20'}`}
                 whileHover={{ 
                   scale: 1.02,
-                  boxShadow: "0 0 40px rgba(0, 255, 198, 0.3)"
+                  boxShadow: "0 0 16px rgba(59, 130, 246, 0.3), 0 0 24px rgba(59, 130, 246, 0.2)"
                 }}
                 transition={{ duration: 0.3 }}
               >
@@ -139,7 +142,7 @@ const HowItWorks = () => {
                       delay: index * 0.5
                     }}
                   >
-                    <div className="absolute inset-0 blur-xl opacity-50 bg-current rounded-full" />
+                    <div className="absolute inset-0 blur-xl opacity-30 bg-current rounded-full" />
                     <div className="relative">
                       {step.icon}
                     </div>
@@ -179,7 +182,7 @@ const HowItWorks = () => {
           transition={{ delay: 1, duration: 0.6 }}
           className="mt-20 text-center"
         >
-          <div className="glass-card p-8 rounded-2xl max-w-2xl mx-auto border-2 border-neon-cyan/30">
+          <div className="glass-card p-8 rounded-2xl max-w-2xl mx-auto border-2 border-blue-500/20">
             <motion.div
               animate={{
                 scale: [1, 1.05, 1],
