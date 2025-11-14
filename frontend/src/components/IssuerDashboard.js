@@ -38,28 +38,67 @@ const IssuerDashboard = ({ account }) => {
 
     try {
       const contract = getCredentialManagerContractReadOnly();
-      const credentialIds = await contract.getCredentialsByIssuer(account);
+      
+      // Check if contract address is set and valid
+      const contractAddress = contract.target || contract.address;
+      if (!contractAddress || contractAddress === '0x' || contractAddress === '') {
+        console.warn('Contract address not configured');
+        setIssuedCredentials([]);
+        return;
+      }
+
+      let credentialIds = [];
+      try {
+        credentialIds = await contract.getCredentialsByIssuer(account);
+      } catch (callError) {
+        // If the call fails with empty result, it might mean no credentials yet
+        if (callError.message && callError.message.includes('value="0x"')) {
+          console.log('No credentials issued yet');
+          setIssuedCredentials([]);
+          return;
+        }
+        throw callError;
+      }
+
+      // Handle empty array
+      if (!credentialIds || credentialIds.length === 0) {
+        setIssuedCredentials([]);
+        return;
+      }
 
       const credentialPromises = credentialIds.map(async (credentialId) => {
-        const credential = await contract.getCredential(credentialId);
-        return {
-          credentialId: credentialId,
-          issuer: credential.issuer,
-          subject: credential.subject,
-          ipfsHash: credential.ipfsHash,
-          isRevoked: credential.isRevoked,
-          issuedAt: new Date(Number(credential.issuedAt) * 1000),
-          revokedAt: credential.revokedAt > 0 
-            ? new Date(Number(credential.revokedAt) * 1000) 
-            : null,
-        };
+        try {
+          const credential = await contract.getCredential(credentialId);
+          return {
+            credentialId: credentialId,
+            issuer: credential.issuer,
+            subject: credential.subject,
+            ipfsHash: credential.ipfsHash,
+            isRevoked: credential.isRevoked,
+            issuedAt: new Date(Number(credential.issuedAt) * 1000),
+            revokedAt: credential.revokedAt > 0 
+              ? new Date(Number(credential.revokedAt) * 1000) 
+              : null,
+          };
+        } catch (err) {
+          console.error(`Error loading credential ${credentialId}:`, err);
+          return null; // Return null for failed credentials
+        }
       });
 
       const credentialData = await Promise.all(credentialPromises);
-      setIssuedCredentials(credentialData);
+      // Filter out null values (failed credential loads)
+      const validCredentials = credentialData.filter(cred => cred !== null);
+      setIssuedCredentials(validCredentials);
     } catch (error) {
       console.error('Error loading issued credentials:', error);
-      setError(`Failed to load credentials: ${error.message}`);
+      // Don't show error if it's just "no credentials" case
+      if (error.message && !error.message.includes('value="0x"')) {
+        setError(`Failed to load credentials: ${error.message}`);
+      } else {
+        // Just set empty array for "no credentials" case
+        setIssuedCredentials([]);
+      }
     } finally {
       setLoadingCredentials(false);
     }
@@ -115,7 +154,10 @@ const IssuerDashboard = ({ account }) => {
         ipfsHash,
         credentialId
       );
-      await tx.wait();
+      
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt);
 
       setMessage({ 
         type: 'success', 
@@ -126,10 +168,20 @@ const IssuerDashboard = ({ account }) => {
       setSubjectAddress('');
       setCredentialName('');
       setSelectedFile(null);
-      document.getElementById('file-input').value = '';
+      const fileInput = document.getElementById('file-input');
+      if (fileInput) {
+        fileInput.value = '';
+      }
 
-      // Reload credentials
-      await loadIssuedCredentials();
+      // Wait a bit for the blockchain state to update, then reload credentials
+      setTimeout(async () => {
+        try {
+          await loadIssuedCredentials();
+        } catch (reloadError) {
+          console.error('Error reloading credentials after issue:', reloadError);
+          // Don't show error to user, just log it
+        }
+      }, 2000); // Wait 2 seconds for state to update
     } catch (error) {
       console.error('Error issuing credential:', error);
       setMessage({ 

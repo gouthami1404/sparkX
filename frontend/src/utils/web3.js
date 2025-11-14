@@ -18,6 +18,7 @@ const CREDENTIAL_MANAGER_ABI = [
   "function getCredential(bytes32 credentialId) public view returns (address issuer, address subject, string memory ipfsHash, bool isRevoked, uint256 issuedAt, uint256 revokedAt)",
   "function getCredentialsBySubject(address subject) public view returns (bytes32[] memory)",
   "function getCredentialsByIssuer(address issuer) public view returns (bytes32[] memory)",
+  "function getTotalCredentials() public view returns (uint256)",
   "function verifyCredential(bytes32 credentialId) public view returns (bool)",
   "event CredentialIssued(bytes32 indexed credentialId, address indexed issuer, address indexed subject, string ipfsHash, uint256 timestamp)",
   "event CredentialRevoked(bytes32 indexed credentialId, address indexed issuer, uint256 timestamp)"

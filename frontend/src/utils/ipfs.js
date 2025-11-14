@@ -8,13 +8,17 @@ import { IPFS_CONFIG } from '../config';
  */
 export const uploadToIPFS = async (file) => {
   try {
-    // Use Pinata if configured
-    if (IPFS_CONFIG.usePinata && IPFS_CONFIG.pinataJWT) {
-      return await uploadToPinata(file);
+    // Use Pinata if configured (prefer JWT, fallback to API key/secret)
+    if (IPFS_CONFIG.usePinata) {
+      if (IPFS_CONFIG.pinataJWT) {
+        return await uploadToPinata(file);
+      } else if (IPFS_CONFIG.pinataApiKey && IPFS_CONFIG.pinataApiSecret) {
+        return await uploadToPinataWithApiKey(file);
+      }
     }
     
-    // Fallback to public IPFS API
-    return await uploadToPublicIPFS(file);
+    // Don't fallback to public IPFS (CORS issues) - show error instead
+    throw new Error('Pinata is not configured. Please set VITE_PINATA_JWT in your .env file. Public IPFS API cannot be used from browser due to CORS restrictions.');
   } catch (error) {
     console.error('IPFS upload error:', error);
     throw new Error(`Failed to upload to IPFS: ${error.message}`);
@@ -79,6 +83,63 @@ const uploadToPinata = async (file) => {
 };
 
 /**
+ * Upload file to Pinata using API Key/Secret (alternative to JWT)
+ * @param {File} file - The file to upload
+ * @returns {Promise<string>} - The IPFS hash (CID)
+ */
+const uploadToPinataWithApiKey = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Add metadata
+    const metadata = JSON.stringify({
+      name: file.name,
+      keyvalues: {
+        app: 'NexID',
+        type: 'credential-document',
+      },
+    });
+    formData.append('pinataMetadata', metadata);
+
+    // Add options for pinning
+    const pinataOptions = JSON.stringify({
+      cidVersion: 1,
+    });
+    formData.append('pinataOptions', pinataOptions);
+
+    const response = await axios.post(
+      `${IPFS_CONFIG.pinataApiUrl}/pinning/pinFileToIPFS`,
+      formData,
+      {
+        headers: {
+          'pinata_api_key': IPFS_CONFIG.pinataApiKey,
+          'pinata_secret_api_key': IPFS_CONFIG.pinataApiSecret,
+          'Content-Type': 'multipart/form-data',
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    const ipfsHash = response.data.IpfsHash;
+    
+    if (!ipfsHash) {
+      throw new Error('Pinata upload failed: No hash returned');
+    }
+
+    console.log('File uploaded to Pinata (API Key):', ipfsHash);
+    return ipfsHash;
+  } catch (error) {
+    console.error('Pinata API Key upload error:', error);
+    if (error.response) {
+      throw new Error(`Pinata upload failed: ${error.response.data?.error?.details || error.response.statusText}`);
+    }
+    throw error;
+  }
+};
+
+/**
  * Upload file to public IPFS API (fallback)
  * @param {File} file - The file to upload
  * @returns {Promise<string>} - The IPFS hash (CID)
@@ -118,13 +179,17 @@ const uploadToPublicIPFS = async (file) => {
  */
 export const uploadJSONToIPFS = async (data) => {
   try {
-    // Use Pinata if configured
-    if (IPFS_CONFIG.usePinata && IPFS_CONFIG.pinataJWT) {
-      return await uploadJSONToPinata(data);
+    // Use Pinata if configured (prefer JWT, fallback to API key/secret)
+    if (IPFS_CONFIG.usePinata) {
+      if (IPFS_CONFIG.pinataJWT) {
+        return await uploadJSONToPinata(data);
+      } else if (IPFS_CONFIG.pinataApiKey && IPFS_CONFIG.pinataApiSecret) {
+        return await uploadJSONToPinataWithApiKey(data);
+      }
     }
     
-    // Fallback to public IPFS API
-    return await uploadJSONToPublicIPFS(data);
+    // Don't fallback to public IPFS (CORS issues) - show error instead
+    throw new Error('Pinata is not configured. Please set VITE_PINATA_JWT in your .env file. Public IPFS API cannot be used from browser due to CORS restrictions.');
   } catch (error) {
     console.error('IPFS JSON upload error:', error);
     throw new Error(`Failed to upload JSON to IPFS: ${error.message}`);
@@ -173,6 +238,54 @@ const uploadJSONToPinata = async (data) => {
     return ipfsHash;
   } catch (error) {
     console.error('Pinata JSON upload error:', error);
+    if (error.response) {
+      throw new Error(`Pinata JSON upload failed: ${error.response.data?.error?.details || error.response.statusText}`);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Upload JSON to Pinata using API Key/Secret (alternative to JWT)
+ * @param {Object} data - The JSON data to upload
+ * @returns {Promise<string>} - The IPFS hash (CID)
+ */
+const uploadJSONToPinataWithApiKey = async (data) => {
+  try {
+    const response = await axios.post(
+      `${IPFS_CONFIG.pinataApiUrl}/pinning/pinJSONToIPFS`,
+      {
+        pinataContent: data,
+        pinataMetadata: {
+          name: 'nexid-proof',
+          keyvalues: {
+            app: 'NexID',
+            type: 'selective-disclosure-proof',
+          },
+        },
+        pinataOptions: {
+          cidVersion: 1,
+        },
+      },
+      {
+        headers: {
+          'pinata_api_key': IPFS_CONFIG.pinataApiKey,
+          'pinata_secret_api_key': IPFS_CONFIG.pinataApiSecret,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const ipfsHash = response.data.IpfsHash;
+    
+    if (!ipfsHash) {
+      throw new Error('Pinata JSON upload failed: No hash returned');
+    }
+
+    console.log('JSON uploaded to Pinata (API Key):', ipfsHash);
+    return ipfsHash;
+  } catch (error) {
+    console.error('Pinata API Key JSON upload error:', error);
     if (error.response) {
       throw new Error(`Pinata JSON upload failed: ${error.response.data?.error?.details || error.response.statusText}`);
     }

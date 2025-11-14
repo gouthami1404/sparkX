@@ -29,28 +29,67 @@ const CredentialManagement = ({ account }) => {
 
     try {
       const contract = getCredentialManagerContractReadOnly();
-      const credentialIds = await contract.getCredentialsBySubject(account);
+      
+      // Check if contract address is set
+      const contractAddress = contract.target || contract.address;
+      if (!contractAddress || contractAddress === '0x' || contractAddress === '') {
+        console.warn('CredentialManager contract address not configured');
+        setCredentials([]);
+        return;
+      }
+
+      let credentialIds = [];
+      try {
+        credentialIds = await contract.getCredentialsBySubject(account);
+      } catch (callError) {
+        // If the call fails with empty result, it means no credentials yet
+        if (callError.message && callError.message.includes('value="0x"')) {
+          console.log('No credentials found for this address');
+          setCredentials([]);
+          return;
+        }
+        throw callError;
+      }
+
+      // Handle empty array
+      if (!credentialIds || credentialIds.length === 0) {
+        setCredentials([]);
+        return;
+      }
 
       const credentialPromises = credentialIds.map(async (credentialId) => {
-        const credential = await contract.getCredential(credentialId);
-        return {
-          credentialId: credentialId,
-          issuer: credential.issuer,
-          subject: credential.subject,
-          ipfsHash: credential.ipfsHash,
-          isRevoked: credential.isRevoked,
-          issuedAt: new Date(Number(credential.issuedAt) * 1000),
-          revokedAt: credential.revokedAt > 0 
-            ? new Date(Number(credential.revokedAt) * 1000) 
-            : null,
-        };
+        try {
+          const credential = await contract.getCredential(credentialId);
+          return {
+            credentialId: credentialId,
+            issuer: credential.issuer,
+            subject: credential.subject,
+            ipfsHash: credential.ipfsHash,
+            isRevoked: credential.isRevoked,
+            issuedAt: new Date(Number(credential.issuedAt) * 1000),
+            revokedAt: credential.revokedAt > 0 
+              ? new Date(Number(credential.revokedAt) * 1000) 
+              : null,
+          };
+        } catch (err) {
+          console.error(`Error loading credential ${credentialId}:`, err);
+          return null; // Return null for failed credentials
+        }
       });
 
       const credentialData = await Promise.all(credentialPromises);
-      setCredentials(credentialData);
+      // Filter out null values (failed credential loads)
+      const validCredentials = credentialData.filter(cred => cred !== null);
+      setCredentials(validCredentials);
     } catch (error) {
       console.error('Error loading credentials:', error);
-      setError(`Failed to load credentials: ${error.message}`);
+      // Don't show error if it's just "no credentials" case
+      if (error.message && !error.message.includes('value="0x"')) {
+        setError(`Failed to load credentials: ${error.message}`);
+      } else {
+        // Just set empty array for "no credentials" case
+        setCredentials([]);
+      }
     } finally {
       setLoading(false);
     }

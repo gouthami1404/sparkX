@@ -36,13 +36,46 @@ const DIDManagement = ({ account }) => {
 
     try {
       const contract = getDIDRegistryContractReadOnly();
-      const hasRegistered = await contract.hasDID(account);
+      
+      // Check if contract address is set
+      const contractAddress = contract.target || contract.address;
+      if (!contractAddress || contractAddress === '0x' || contractAddress === '') {
+        console.warn('DIDRegistry contract address not configured');
+        setHasDID(false);
+        setDid('');
+        setNewDID('');
+        return;
+      }
+
+      let hasRegistered = false;
+      try {
+        hasRegistered = await contract.hasDID(account);
+      } catch (callError) {
+        // If the call fails with empty result, it means no DID registered yet
+        if (callError.message && callError.message.includes('value="0x"')) {
+          console.log('No DID registered yet');
+          setHasDID(false);
+          setDid('');
+          setNewDID('');
+          return;
+        }
+        throw callError;
+      }
+
       setHasDID(hasRegistered);
 
       if (hasRegistered) {
-        const registeredDID = await contract.getDID(account);
-        setDid(registeredDID);
-        setNewDID(registeredDID);
+        try {
+          const registeredDID = await contract.getDID(account);
+          setDid(registeredDID);
+          setNewDID(registeredDID);
+        } catch (didError) {
+          console.error('Error fetching DID:', didError);
+          // If we can't fetch the DID, assume it doesn't exist
+          setHasDID(false);
+          setDid('');
+          setNewDID('');
+        }
       } else {
         // Reset if no DID registered
         setDid('');
@@ -53,8 +86,12 @@ const DIDManagement = ({ account }) => {
       // Only show error if it's not a "no DID" case
       if (error.message && !error.message.includes('value="0x"')) {
         setMessage({ type: 'error', text: `Failed to load DID: ${error.message}` });
+      } else {
+        // Just set to no DID for empty result case
+        setHasDID(false);
+        setDid('');
+        setNewDID('');
       }
-      setHasDID(false);
     } finally {
       setLoading(false);
     }
