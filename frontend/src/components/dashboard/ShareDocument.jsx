@@ -18,6 +18,21 @@ const ShareDocument = ({ account }) => {
     loadCredentials()
   }, [account])
 
+  // Listen for credential issued events to auto-refresh
+  useEffect(() => {
+    const handleCredentialIssued = () => {
+      // Wait a bit for blockchain to update, then refresh
+      setTimeout(() => {
+        loadCredentials()
+      }, 2000)
+    }
+
+    window.addEventListener('credentialIssued', handleCredentialIssued)
+    return () => {
+      window.removeEventListener('credentialIssued', handleCredentialIssued)
+    }
+  }, [account]) // Include account to ensure we have the right context
+
   const loadCredentials = async () => {
     if (!account || !account.startsWith('0x')) {
       setCredentials([])
@@ -49,7 +64,8 @@ const ShareDocument = ({ account }) => {
       })
 
       const credentialData = await Promise.all(credentialPromises)
-      const validCredentials = credentialData.filter(cred => cred !== null && !cred.isRevoked)
+      // Show all credentials (including revoked ones) so users can see what they've issued
+      const validCredentials = credentialData.filter(cred => cred !== null)
       setCredentials(validCredentials)
     } catch (error) {
       console.error('Error loading credentials:', error)
@@ -113,11 +129,20 @@ const ShareDocument = ({ account }) => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div>
-        <h2 className="text-3xl font-bold text-gray-100 mb-2">Share Document</h2>
-        <p className="text-gray-400">
-          Generate a shareable URL to send a document to a specific recipient.
-        </p>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-100 mb-2">Share Document</h2>
+          <p className="text-gray-400">
+            Generate a shareable URL to send a document to a specific recipient.
+          </p>
+        </div>
+        <button
+          onClick={loadCredentials}
+          disabled={loading}
+          className="neon-button-secondary px-4 py-2 text-sm disabled:opacity-50"
+        >
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
       </div>
 
       <AnimatePresence>
@@ -168,8 +193,15 @@ const ShareDocument = ({ account }) => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="text-gray-100 font-medium mb-1">
-                        Credential ID: {formatAddress(credential.credentialId)}
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="text-gray-100 font-medium">
+                          Credential ID: {formatAddress(credential.credentialId)}
+                        </div>
+                        {credential.isRevoked && (
+                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs">
+                            Revoked
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-400">
                         <div>Issued to: <span className="text-neon-cyan font-mono">{formatAddress(credential.subject)}</span></div>

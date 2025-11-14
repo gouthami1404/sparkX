@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, FileText, Upload, Key, Shield, LogOut, Share2, Download } from 'lucide-react'
+import { Home, FileText, Upload, Key, LogOut } from 'lucide-react'
 import HomeTab from '../components/dashboard/HomeTab'
 import MyDocuments from '../components/dashboard/MyDocuments'
 import IssueDocument from '../components/dashboard/IssueDocument'
 import DIDManager from '../components/dashboard/DIDManager'
-import IssuerDashboard from '../components/dashboard/IssuerDashboard'
-import ShareDocument from '../components/dashboard/ShareDocument'
-import ReceiveDocument from '../components/dashboard/ReceiveDocument'
 import { formatAddress } from '../utils/helpers'
 
 const Dashboard = ({ account, setAccount }) => {
@@ -21,10 +18,7 @@ const Dashboard = ({ account, setAccount }) => {
     { id: 'home', label: 'Home', icon: Home, path: '/dashboard' },
     { id: 'documents', label: 'My Documents', icon: FileText, path: '/dashboard/documents' },
     { id: 'issue', label: 'Issue Document', icon: Upload, path: '/dashboard/issue' },
-    { id: 'share', label: 'Share Document', icon: Share2, path: '/dashboard/share' },
-    { id: 'receive', label: 'Receive Document', icon: Download, path: '/dashboard/receive' },
     { id: 'did', label: 'DID Manager', icon: Key, path: '/dashboard/did' },
-    { id: 'issuer', label: 'Issuer Dashboard', icon: Shield, path: '/dashboard/issuer' },
   ]
 
   return (
@@ -85,10 +79,7 @@ const Dashboard = ({ account, setAccount }) => {
               <Route path="/" element={<HomeTab account={account} />} />
               <Route path="/documents" element={<MyDocuments account={account} />} />
               <Route path="/issue" element={<IssueDocument account={account} />} />
-              <Route path="/share" element={<ShareDocument account={account} />} />
-              <Route path="/receive" element={<ReceiveDocument account={account} />} />
               <Route path="/did" element={<DIDManager account={account} />} />
-              <Route path="/issuer" element={<IssuerDashboard account={account} />} />
             </Routes>
           </main>
         </div>

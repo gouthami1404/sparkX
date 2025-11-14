@@ -1,11 +1,30 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Eye, FileText, Shield, X, CheckCircle } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Eye, FileText, Shield, X, CheckCircle, Edit2, Save, Tag, Calendar, User } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { getCredentialManagerContractReadOnly } from '../../utils/web3'
 import { formatAddress, formatDate } from '../../utils/helpers'
 import { getIPFSFileUrl } from '../../utils/ipfs'
+
+// Helper functions for metadata storage
+const getMetadataKey = (credentialId) => `credential_metadata_${credentialId}`
+const getMetadata = (credentialId) => {
+  try {
+    const stored = localStorage.getItem(getMetadataKey(credentialId))
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    return null
+  }
+}
+const saveMetadata = (credentialId, metadata) => {
+  try {
+    localStorage.setItem(getMetadataKey(credentialId), JSON.stringify(metadata))
+    return true
+  } catch {
+    return false
+  }
+}
 
 const MyDocuments = ({ account }) => {
   const [searchParams] = useSearchParams()
@@ -13,10 +32,27 @@ const MyDocuments = ({ account }) => {
   const [credentials, setCredentials] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCredential, setSelectedCredential] = useState(null)
+  const [editingCredential, setEditingCredential] = useState(null)
+  const [editForm, setEditForm] = useState({ name: '', category: '', description: '', notes: '' })
 
   useEffect(() => {
     loadCredentials()
   }, [account])
+
+  // Listen for credential issued events to auto-refresh
+  useEffect(() => {
+    const handleCredentialIssued = () => {
+      // Wait a bit for blockchain to update, then refresh
+      setTimeout(() => {
+        loadCredentials()
+      }, 2000)
+    }
+
+    window.addEventListener('credentialIssued', handleCredentialIssued)
+    return () => {
+      window.removeEventListener('credentialIssued', handleCredentialIssued)
+    }
+  }, [account]) // Include account to ensure we have the right context
 
   const loadCredentials = async () => {
     if (!account || !account.startsWith('0x')) {
@@ -100,8 +136,14 @@ const MyDocuments = ({ account }) => {
       const credentialPromises = credentialIds.map(async (credentialId) => {
         try {
           const credential = await contract.getCredential(credentialId)
+          const credentialIdStr = credentialId.toString()
+          
+          // Load metadata from localStorage
+          const metadata = getMetadata(credentialIdStr) || {}
+          
           return {
             credentialId: credentialId,
+            credentialIdStr: credentialIdStr,
             issuer: credential.issuer,
             subject: credential.subject,
             ipfsHash: credential.ipfsHash,
@@ -110,6 +152,11 @@ const MyDocuments = ({ account }) => {
             revokedAt: credential.revokedAt > 0 
               ? new Date(Number(credential.revokedAt) * 1000) 
               : null,
+            // Add metadata fields
+            name: metadata.name || 'Untitled Document',
+            category: metadata.category || 'other',
+            description: metadata.description || '',
+            notes: metadata.notes || '',
           }
         } catch (err) {
           return null
@@ -128,9 +175,37 @@ const MyDocuments = ({ account }) => {
     }
   }
 
+  const handleEdit = (credential) => {
+    setEditingCredential(credential.credentialIdStr)
+    setEditForm({
+      name: credential.name || '',
+      category: credential.category || 'other',
+      description: credential.description || '',
+      notes: credential.notes || '',
+    })
+  }
+
+  const handleSaveMetadata = (credentialIdStr) => {
+    if (saveMetadata(credentialIdStr, editForm)) {
+      // Update the credential in state
+      setCredentials(prev => prev.map(cred => 
+        cred.credentialIdStr === credentialIdStr
+          ? { ...cred, ...editForm }
+          : cred
+      ))
+      setEditingCredential(null)
+      setEditForm({ name: '', category: '', description: '', notes: '' })
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCredential(null)
+    setEditForm({ name: '', category: '', description: '', notes: '' })
+  }
+
   const filteredCredentials = category === 'all' 
     ? credentials 
-    : credentials.filter(c => c.category === category)
+    : credentials.filter(c => (c.category || 'other') === category)
 
   if (loading) {
     return (
@@ -191,7 +266,7 @@ const MyDocuments = ({ account }) => {
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3 mb-3 flex-wrap">
                     {credential.isRevoked ? (
                       <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-medium flex items-center gap-2">
                         <X size={14} />
@@ -203,32 +278,132 @@ const MyDocuments = ({ account }) => {
                         Active
                       </span>
                     )}
+                    {credential.category && credential.category !== 'other' && (
+                      <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-medium flex items-center gap-2">
+                        <Tag size={14} />
+                        {credential.category}
+                      </span>
+                    )}
                   </div>
                   
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Issued by:</span>{' '}
-                      <span className="text-neon-cyan font-mono">{formatAddress(credential.issuer)}</span>
+                  {editingCredential === credential.credentialIdStr ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Document Name</label>
+                        <input
+                          type="text"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          className="w-full px-3 py-2 bg-dark-card border border-gray-700 rounded-lg text-gray-100 text-sm focus:outline-none focus:border-neon-cyan"
+                          placeholder="Enter document name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Category</label>
+                        <select
+                          value={editForm.category}
+                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                          className="w-full px-3 py-2 bg-dark-card border border-gray-700 rounded-lg text-gray-100 text-sm focus:outline-none focus:border-neon-cyan"
+                        >
+                          <option value="educational">Educational</option>
+                          <option value="employment">Employment</option>
+                          <option value="medical">Medical</option>
+                          <option value="confidential">Confidential</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Description</label>
+                        <input
+                          type="text"
+                          value={editForm.description}
+                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                          className="w-full px-3 py-2 bg-dark-card border border-gray-700 rounded-lg text-gray-100 text-sm focus:outline-none focus:border-neon-cyan"
+                          placeholder="Brief description"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Notes</label>
+                        <textarea
+                          value={editForm.notes}
+                          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                          className="w-full px-3 py-2 bg-dark-card border border-gray-700 rounded-lg text-gray-100 text-sm focus:outline-none focus:border-neon-cyan"
+                          placeholder="Your personal notes..."
+                          rows={3}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSaveMetadata(credential.credentialIdStr)}
+                          className="neon-button px-4 py-2 text-sm flex items-center gap-2"
+                        >
+                          <Save size={16} />
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-4 py-2 text-sm bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Issued on:</span>{' '}
-                      <span className="text-gray-300">{formatDate(credential.issuedAt)}</span>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-100 mb-1">
+                          {credential.name || 'Untitled Document'}
+                        </h3>
+                        {credential.description && (
+                          <p className="text-sm text-gray-400">{credential.description}</p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User size={14} className="text-gray-500" />
+                          <span className="text-gray-500">Issued by:</span>{' '}
+                          <span className="text-neon-cyan font-mono">{formatAddress(credential.issuer)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} className="text-gray-500" />
+                          <span className="text-gray-500">Issued on:</span>{' '}
+                          <span className="text-gray-300">{formatDate(credential.issuedAt)}</span>
+                        </div>
+                        {credential.notes && (
+                          <div className="mt-2 p-3 bg-dark-card rounded-lg">
+                            <span className="text-xs text-gray-500">Notes:</span>
+                            <p className="text-sm text-gray-300 mt-1">{credential.notes}</p>
+                          </div>
+                        )}
+                        <div className="pt-2 border-t border-gray-700">
+                          <span className="text-gray-500 text-xs">IPFS Hash:</span>{' '}
+                          <span className="text-gray-400 font-mono text-xs break-all">{credential.ipfsHash}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">IPFS Hash:</span>{' '}
-                      <span className="text-gray-400 font-mono text-xs">{credential.ipfsHash}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="flex gap-2 ml-4">
-                  <button
-                    onClick={() => window.open(getIPFSFileUrl(credential.ipfsHash), '_blank')}
-                    className="neon-button-secondary px-4 py-2 text-sm flex items-center gap-2"
-                  >
-                    <Eye size={16} />
-                    View
-                  </button>
+                <div className="flex gap-2 ml-4 flex-shrink-0">
+                  {editingCredential !== credential.credentialIdStr && (
+                    <>
+                      <button
+                        onClick={() => handleEdit(credential)}
+                        className="neon-button-secondary px-3 py-2 text-sm flex items-center gap-2"
+                        title="Edit metadata"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => window.open(getIPFSFileUrl(credential.ipfsHash), '_blank')}
+                        className="neon-button-secondary px-3 py-2 text-sm flex items-center gap-2"
+                        title="View document"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>

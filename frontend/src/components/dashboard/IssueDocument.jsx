@@ -127,7 +127,35 @@ const IssueDocument = ({ account }) => {
       // Get contract instance first (needed for parsing logs later)
       const contract = await getCredentialManagerContract()
       
+      // Verify contract address and code
+      const contractAddress = contract.target || contract.address
+      console.log('Contract address:', contractAddress)
+      
+      try {
+        const provider = contract.provider || (await contract.runner?.provider)
+        if (provider) {
+          const code = await provider.getCode(contractAddress)
+          if (code === '0x' || code === '0x0') {
+            throw new Error(
+              `No contract code found at address ${contractAddress}.\n\n` +
+              `Please ensure:\n` +
+              `1. Contracts are deployed (run: npm run deploy)\n` +
+              `2. Contract address in contractAddresses.json is correct\n` +
+              `3. You're connected to the correct network`
+            )
+          }
+          console.log('✅ Contract code verified at address')
+        }
+      } catch (verifyError) {
+        console.warn('Could not verify contract code:', verifyError.message)
+      }
+      
       const tx = await retryWithBackoff(async () => {
+        console.log('Calling issueCredential with:', {
+          subject: normalizedSubject,
+          ipfsHash,
+          credentialId: credentialId.toString()
+        })
         return await contract.issueCredential(
           normalizedSubject,
           ipfsHash,
@@ -142,20 +170,37 @@ const IssueDocument = ({ account }) => {
       
       console.log('Transaction confirmed:', tx.hash)
       console.log('Transaction receipt status:', receipt.status)
+      console.log('Transaction to address:', receipt.to)
+      console.log('Contract address:', contractAddress)
       
       if (receipt.status !== 1) {
         throw new Error('Transaction failed! Status: ' + receipt.status)
       }
       
+      // Verify transaction was sent to correct contract
+      if (receipt.to && receipt.to.toLowerCase() !== contractAddress.toLowerCase()) {
+        console.warn('⚠️ Transaction sent to different address!')
+        console.warn('   Expected:', contractAddress)
+        console.warn('   Actual:', receipt.to)
+      }
+      
       // Check for CredentialIssued event in the receipt
       const contractInterface = contract.interface
-      const logs = receipt.logs
+      const logs = receipt.logs || []
       console.log('Transaction logs:', logs.length)
       
+      if (logs.length === 0) {
+        console.warn('⚠️ No events emitted in transaction!')
+        console.warn('   This might indicate the contract function did not execute properly')
+        console.warn('   Check: Contract address, ABI match, and contract deployment')
+      }
+      
+      let eventFound = false
       for (const log of logs) {
         try {
           const parsedLog = contractInterface.parseLog(log)
           if (parsedLog && parsedLog.name === 'CredentialIssued') {
+            eventFound = true
             console.log('✅ CredentialIssued event found:', parsedLog.args)
             console.log('   Event credentialId:', parsedLog.args.credentialId)
             console.log('   Event issuer:', parsedLog.args.issuer)
@@ -163,7 +208,13 @@ const IssueDocument = ({ account }) => {
           }
         } catch (e) {
           // Not our event, skip
+          console.log('Log parsing error (not our event):', e.message)
         }
+      }
+      
+      if (!eventFound && logs.length > 0) {
+        console.warn('⚠️ Events found but CredentialIssued event not detected')
+        console.warn('   This might indicate an ABI mismatch')
       }
       
       console.log('Credential issued to:', normalizedSubject)
@@ -173,42 +224,54 @@ const IssueDocument = ({ account }) => {
       let verified = false
       let storedIssuerAddress = null
       
-      for (let i = 0; i < 5; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second between retries
-        try {
-          const verifyContract = getCredentialManagerContractReadOnly()
-          const storedCredential = await verifyContract.getCredential(credentialId)
-          console.log(`✅ Credential verified on-chain (attempt ${i + 1}):`, storedCredential)
-          console.log('   Stored subject:', storedCredential.subject)
-          console.log('   Stored issuer:', storedCredential.issuer)
-          storedIssuerAddress = storedCredential.issuer
-          console.log('   IPFS Hash:', storedCredential.ipfsHash)
-          
-          // Try to get issuer's credentials using the STORED issuer address
+      // Only try to verify if we found the event or have logs
+      if (eventFound || logs.length > 0) {
+        for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds between retries
           try {
-            const issuerCreds = await verifyContract.getCredentialsByIssuer(storedCredential.issuer)
-            console.log('✅ Credentials for issuer (using stored address):', issuerCreds.length, issuerCreds)
-          } catch (e) {
-            console.log('Could not get issuer credentials list:', e.message)
-          }
-          
-          // Also verify it's in the subject's list
-          try {
-            const subjectCreds = await verifyContract.getCredentialsBySubject(normalizedSubject)
-            console.log('✅ Credentials for subject:', subjectCreds.length, subjectCreds)
-          } catch (e) {
-            console.log('Could not get subject credentials list (might be empty array):', e.message)
-          }
-          
-          verified = true
-          break
-        } catch (verifyError) {
-          if (i === 4) {
-            console.warn('⚠️ Could not verify credential after 5 attempts:', verifyError.message)
-            console.log('   Transaction succeeded, but cannot read credential back')
-            console.log('   This might indicate a contract/ABI mismatch')
+            const verifyContract = getCredentialManagerContractReadOnly()
+            const storedCredential = await verifyContract.getCredential(credentialId)
+            console.log(`✅ Credential verified on-chain (attempt ${i + 1}):`, storedCredential)
+            console.log('   Stored subject:', storedCredential.subject)
+            console.log('   Stored issuer:', storedCredential.issuer)
+            storedIssuerAddress = storedCredential.issuer
+            console.log('   IPFS Hash:', storedCredential.ipfsHash)
+            
+            // Try to get issuer's credentials using the STORED issuer address
+            try {
+              const issuerCreds = await verifyContract.getCredentialsByIssuer(storedCredential.issuer)
+              console.log('✅ Credentials for issuer (using stored address):', issuerCreds.length, issuerCreds)
+            } catch (e) {
+              console.log('Could not get issuer credentials list:', e.message)
+            }
+            
+            // Also verify it's in the subject's list
+            try {
+              const subjectCreds = await verifyContract.getCredentialsBySubject(normalizedSubject)
+              console.log('✅ Credentials for subject:', subjectCreds.length, subjectCreds)
+            } catch (e) {
+              console.log('Could not get subject credentials list (might be empty array):', e.message)
+            }
+            
+            verified = true
+            break
+          } catch (verifyError) {
+            if (i === 4) {
+              console.warn('⚠️ Could not verify credential after 5 attempts:', verifyError.message)
+              console.log('   Transaction succeeded, but cannot read credential back')
+              console.log('   Possible issues:')
+              console.log('   1. Contract address mismatch')
+              console.log('   2. ABI mismatch')
+              console.log('   3. Contract not properly deployed')
+              console.log('   4. Network/blockchain sync issue')
+            } else {
+              console.log(`   Verification attempt ${i + 1} failed, retrying...`)
+            }
           }
         }
+      } else {
+        console.warn('⚠️ Skipping verification - no events found in transaction')
+        console.warn('   The transaction may not have executed the contract function')
       }
       
       if (verified && storedIssuerAddress) {
@@ -223,18 +286,49 @@ const IssueDocument = ({ account }) => {
       if (!verified) {
         console.log('💡 Tip: The credential was issued successfully (transaction confirmed)')
         console.log('💡 But we cannot read it back - this might be a contract issue')
-        console.log('💡 Try: Re-deploy contracts and issue a new credential')
+        console.log('')
+        console.log('🔧 Troubleshooting steps:')
+        console.log('   1. Verify contracts are deployed:')
+        console.log('      - Make sure Hardhat node is running: npm run node')
+        console.log('      - Deploy contracts: npm run deploy')
+        console.log('   2. Check contract address in contractAddresses.json matches deployed address')
+        console.log('   3. Verify you are connected to the correct network (Chain ID: 1337)')
+        console.log('   4. Check if contract code exists at the address')
+        console.log('   5. Try issuing a new credential after redeploying')
       }
       
       setMessage({ 
         type: 'success', 
-        text: `Credential issued successfully! Check "Issuer Dashboard" to see it. Transaction: ${tx.hash.substring(0, 20)}...` 
+        text: `Credential issued successfully! The credential will appear in "My Documents", "Share Documents", and "Issuer Dashboard". Transaction: ${tx.hash.substring(0, 20)}...` 
       })
       setSuccess(true)
       
-      // Auto-refresh issuer dashboard after 3 seconds
+      // Save metadata for the recipient (if they're viewing My Documents)
+      // Note: This saves metadata locally, so it will appear when the recipient views their documents
+      try {
+        const recipientMetadata = {
+          name: credentialName || 'Untitled Document',
+          category: 'other', // Default category, can be changed by recipient
+          description: '',
+          notes: ''
+        }
+        const metadataKey = `credential_metadata_${credentialId.toString()}`
+        localStorage.setItem(metadataKey, JSON.stringify(recipientMetadata))
+        console.log('✅ Metadata saved for recipient')
+      } catch (e) {
+        console.log('Could not save metadata:', e.message)
+      }
+
+      // Dispatch event to trigger refresh in other components
       setTimeout(() => {
-        console.log('💡 Auto-refreshing in 3 seconds... Go to Issuer Dashboard tab to see your credential.')
+        window.dispatchEvent(new CustomEvent('credentialIssued', { 
+          detail: { 
+            credentialId, 
+            issuer: normalizedIssuer, 
+            subject: normalizedSubject 
+          } 
+        }))
+        console.log('✅ Credential issued event dispatched - other tabs will auto-refresh')
       }, 3000)
 
       // Reset form

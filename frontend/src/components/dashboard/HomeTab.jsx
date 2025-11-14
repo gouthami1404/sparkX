@@ -140,12 +140,6 @@ const HomeTab = ({ account }) => {
           >
             Manage DID
           </button>
-          <button
-            onClick={() => navigate('/dashboard/issuer')}
-            className="neon-button-secondary px-6 py-3"
-          >
-            Issuer Dashboard
-          </button>
         </div>
       </div>
     </motion.div>

@@ -18,6 +18,21 @@ const IssuerDashboard = ({ account }) => {
     }
   }, [account])
 
+  // Listen for credential issued events to auto-refresh
+  useEffect(() => {
+    const handleCredentialIssued = () => {
+      // Wait a bit for blockchain to update, then refresh
+      setTimeout(() => {
+        loadIssuedCredentials()
+      }, 2000)
+    }
+
+    window.addEventListener('credentialIssued', handleCredentialIssued)
+    return () => {
+      window.removeEventListener('credentialIssued', handleCredentialIssued)
+    }
+  }, [account]) // Include account to ensure we have the right context
+
   const loadIssuedCredentials = async () => {
     if (!account || !account.startsWith('0x')) {
       setLoadingCredentials(false)
